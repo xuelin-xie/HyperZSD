@@ -5,7 +5,7 @@ Official PyTorch implementation for the paper: **"Enabling Efficient Zero-Shot N
 
 # Introduction
 Zero-shot Noise2Noise (ZSN2N) has shown immense potential for image restoration without clean targets. However, directly applying vanilla ZSN2N to Hyperspectral Images (HSIs) faces two fatal bottlenecks: the violation of the zero-mean assumption under structured stripe noise, and limited robustness to complex heteroscedastic mixed noise (Gaussian + impulse + stripes). 
-![image](https://github.com/xuelin-xie/HyperZSD/blob/main/images/Background.png)
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/Background.png)
 
 **We propose Hyper-ZSD**, a highly efficient, zero-shot self-supervised framework designed specifically for HSIs. By introducing a theoretically justified Neighborhood-Completion (NC) downsampler and a Mask-Guided Residual Learning strategy, Hyper-ZSD achieves state-of-the-art mixed-noise removal while taking only a few seconds on a single GPU. 
 
@@ -15,7 +15,7 @@ Zero-shot Noise2Noise (ZSN2N) has shown immense potential for image restoration 
 This repository contains the official PyTorch implementation of Hyper-ZSD. The core framework of this work is:
 
 # Framework Overview
-![image](https://github.com/xuelin-xie/HyperZSD/blob/main/images/HyperZSD_framework.png)
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/HyperZSD_framework.png)
 
 # 📐 Mathematical Insights & Analysis
 Hyper-ZSD is grounded in rigorous mathematical analysis. We establish the following propositions and theorems to explain both the theoretical bottleneck of vanilla ZSN2N and the effectiveness of our NC mechanism.
@@ -51,7 +51,7 @@ Under local smoothness assumptions, the downsampled pairs \((\mathbf{y}_1, \math
 To overcome the limitations of vanilla ZSN2N, Hyper-ZSD is built upon three synergistic components:
 
 1. **Neighborhood-Completion (NC) Downsampler:** Relaxes the strict zero-mean constraint by detecting and completing stripe-corrupted lines using nearest clean neighbors *before* sampling.
-![image](https://github.com/xuelin-xie/HyperZSD/blob/main/images/NC_Downsampling.png)
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/NC_Downsampling.png)
 2. **Mask-Guided Residual Loss:** Dynamically derives continuous soft masks from network residuals to adaptively balance \(L_1\) and \(L_2\) penalties, suppressing both sparse impulse and dense Gaussian noise without predefined models.
 3. **Low-Rank Spectral Subspace:** Formulates a model-data hybrid paradigm. By projecting the HSI into a compact subspace via truncated SVD, it reduces the network parameters to ~40k while preserving spectral fidelity.
 
