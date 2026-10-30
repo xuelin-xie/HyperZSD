@@ -68,5 +68,8 @@ To overcome the limitations of vanilla ZSN2N, Hyper-ZSD is built upon three syne
 3. **Robustness:** Consistently outperforms complex model-based and deep learning-based baselines under severe mixed noise.
 4. **Purity:** Requires no pre-training (unlike FastHyMix, HIR-Diff, etc.) and no clean references.
 
+# Paper Information:
+Xuelin Xie, Xiliang Lu, and Long Chen. Enabling Efficient Zero-Shot Noise2Noise for Hyperspectral Images. Revised manuscript resubmitted to "IEEE Transactions on Geoscience and Remote Sensing" (IEEE TGRS).
+
 # 🛠️ Usage
 *(Code will be updated here upon acceptance)*
