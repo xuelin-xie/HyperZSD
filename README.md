@@ -1,169 +1,75 @@
 # Hyper-ZSD
+⚠️ <span style="color: blue;">**The code will be fully uploaded upon formal acceptance.**</span>
 
-**Hyper-ZSD** is a Zero-shot Noise2Noise framework for hyperspectral image denoising. This repository provides a modular implementation of the method, including spectral subspace projection, stripe neighborhood completion, mask-guided residual learning, and consistency-based self-supervision.
+Official PyTorch implementation for the paper: **"Enabling Efficient Zero-Shot Noise2Noise for Hyperspectral Images"**.
 
-> **Reproducibility note:** This repository is a research-code refactoring of the supplied implementation. Before publication, verify all implementation details against the final manuscript and benchmark protocol. In particular, report the exact data preprocessing, noise parameters, random seeds, hardware, software versions, and evaluation conventions used for every table.
+# Introduction
+Zero-shot Noise2Noise (ZSN2N) has shown immense potential for image restoration without clean targets. However, directly applying vanilla ZSN2N to Hyperspectral Images (HSIs) faces two fatal bottlenecks: the violation of the zero-mean assumption under structured stripe noise, and limited robustness to complex heteroscedastic mixed noise (Gaussian + impulse + stripes). 
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/Background.png)
 
-## 1. Repository structure
+**We propose Hyper-ZSD**, a highly efficient, zero-shot self-supervised framework designed specifically for HSIs. By introducing a theoretically justified Neighborhood-Completion (NC) downsampler and a Mask-Guided Residual Learning strategy, Hyper-ZSD achieves state-of-the-art mixed-noise removal while taking only a few seconds on a single GPU. 
 
-```text
-HyperZSD/
-├── hyperzsd/
-│   ├── config.py          # Experiment configuration
-│   ├── data.py            # MATLAB HSI loading and normalization
-│   ├── noise.py           # Six synthetic noise protocols
-│   ├── operators.py       # SVD, neighborhood completion, pair downsampling
-│   ├── models.py          # Hyper-ZSD network
-│   ├── losses.py          # Mask-guided and consistency losses
-│   ├── metrics.py         # PSNR, SSIM, SAM
-│   ├── visualization.py   # Loss curves and RGB composites
-│   ├── engine.py          # Training and reconstruction pipeline
-│   └── utils.py           # Seeds, device selection, serialization
-├── tests/
-│   └── test_core.py
-├── data/                  # Put datasets here (not tracked by Git)
-├── outputs/               # Experiment outputs (not tracked by Git)
-├── main.py
-├── requirements.txt
-├── pyproject.toml
-└── README.md
-```
+> **Key Advantage:** Hyper-ZSD contains only **~40,000 parameters** and requires **no clean data, no external training sets, and no pre-trained models**. It achieves true one-shot zero-shot restoration.
 
-## 2. Installation
+# Contents
+This repository contains the official PyTorch implementation of Hyper-ZSD. The core framework of this work is:
 
-We recommend creating an isolated Python environment. Install a PyTorch build compatible with your CUDA version from the [official PyTorch installation selector](https://pytorch.org/get-started/locally/), then install the remaining dependencies:
+# Framework Overview
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/HyperZSD_framework.png)
 
-```bash
-git clone <YOUR-REPOSITORY-URL>
-cd HyperZSD
+# 📐 Mathematical Insights & Analysis
+Hyper-ZSD is grounded in rigorous mathematical analysis. We establish the following propositions and theorems to explain both the theoretical bottleneck of vanilla ZSN2N and the effectiveness of our NC mechanism.
 
-conda create -n hyperzsd python=3.10 -y
-conda activate hyperzsd
+### 🔹 Proposition 1: Zero-Mean Violation under Stripe Noise
+Let $(\mathbf{y}_1, \mathbf{y}_2)$ be the downsampled image pair from the noisy observation $\mathbf{y} = \mathbf{x} + \mathbf{n}$. 
+If $\mathbf{n}$ is zero-mean Gaussian or Poisson noise, then $\mathbb{E}[\mathbf{y}_i \mid \mathbf{x}] = \mathbf{x}_i$. 
+However, if $\mathbf{n}$ is **stripe noise with non-zero mean structure**, in general:
 
-# Install the appropriate PyTorch build for your machine first.
-pip install -r requirements.txt
-pip install -e .
-```
+$$
+\mathbb{E}[\mathbf{y}_i \mid \mathbf{x}] \neq \mathbf{x}_i, \quad i = 1,2
+$$
 
-## 3. Dataset preparation
+*This formally explains why vanilla ZSN2N fails on stripe-corrupted HSIs.*
 
-Place the MATLAB dataset in `data/`. By default, the loader expects:
+### 🔹 Theorem 1: Bounded NC Approximation Error
+Assume the clean image $\mathbf{x}$ is locally $L$-Lipschitz continuous on a search neighborhood of radius $r$. The approximation error introduced by our NC interpolation is strictly bounded by the local variation:
 
-- File: `data/Salinas_scene.mat`
-- MATLAB variable: `O_Img`
-- Cube layout: height × width × spectral bands
+$$
+|\tilde{x}(p)-x(p)| \le Lr
+$$
 
-You can specify a different path and MATLAB variable using command-line arguments. The loader independently min-max normalizes each spectral band, matching the supplied implementation.
+Consequently, for $N_s$ completed pixels, the global Frobenius norm error is bounded by:
 
-## 4. Run Hyper-ZSD
+$$
+\|\tilde{\mathbf{x}}-\mathbf{x}\|_F \le Lr\sqrt{N_s}
+$$
 
-Default experiment:
+### 🔹 Proposition 2: Approximate Zero-Mean Condition
+Under local smoothness assumptions, the downsampled pairs $(\mathbf{y}_1, \mathbf{y}_2)$ generated by the NC downsampler approximately satisfy the zero-conditional-mean property required by Noise2Noise:
 
-```bash
-python main.py
-```
+$$
+\mathbb{E}[\mathbf{y}_i \mid \mathbf{x}] \approx \mathbf{x}_i, \quad i=1,2
+$$
 
-```bash
-python main.py --noise Case5 --spectral-dim 6 \
-               --tau 0.05 --threshold-rho 0.05 --max-search-distance 3 \
-               --output outputs/Salinas
-```
+*This provides a closer approximation to the zero-conditional-mean assumption required by Noise2Noise learning.*
 
-Specify the dataset, noise protocol, training epochs, and output directory:
+# 🌟 Key Innovations
+To overcome the limitations of vanilla ZSN2N, Hyper-ZSD is built upon three synergistic components:
 
-```bash
-python main.py \
-  --data data/Salinas_scene.mat \
-  --data-key O_Img \
-  --noise Case5 \
-  --epochs 2000 \
-  --spectral-dim 6 \
-  --seed 2026 \
-  --device auto \
-  --output outputs/salinas_case5
-```
+1. **Neighborhood-Completion (NC) Downsampler:** Relaxes the strict zero-mean constraint by detecting and completing stripe-corrupted lines using nearest clean neighbors *before* sampling.
+![image](https://github.com/xuelin-xie/HyperZSD/blob/main/Images/NC_Downsampling.png)
+2. **Mask-Guided Residual Loss:** Dynamically derives continuous soft masks from network residuals to adaptively balance \(L_1\) and \(L_2\) penalties, suppressing both sparse impulse and dense Gaussian noise without predefined models.
+3. **Low-Rank Spectral Subspace:** Formulates a model-data hybrid paradigm. By projecting the HSI into a compact subspace via truncated SVD, it reduces the network parameters to ~40k while preserving spectral fidelity.
 
-Available noise protocols:
 
-| Protocol | Description |
-|---|---|
-| Case1 | i.i.d. Gaussian noise |
-| Case2 | Non-i.i.d. Gaussian noise |
-| Case3 | Non-i.i.d. Gaussian + stripe corruption |
-| Case4 | Gaussian + stripe corruption |
-| Case5 | Gaussian + salt-and-pepper + stripe corruption |
-| Case6 | Mixed non-i.i.d. Gaussian, impulse, varying stripe, and dead-line corruption |
+# 📊 Advantages
+1. **Extreme Efficiency:** Reconstructs a full HSI within **seconds** (e.g., 7-10s on WDC/PaU) on a single GPU.
+2. **Minimal Parameter Tuning:** Requires only a single, highly insensitive subspace dimension \(k\).
+3. **Robustness:** Consistently outperforms complex model-based and deep learning-based baselines under severe mixed noise.
+4. **Purity:** Requires no pre-training (unlike FastHyMix, HIR-Diff, etc.) and no clean references.
 
-Use `--metric-mode per_band` to additionally report band-wise metric values in `metrics.json`.
+# Paper Information:
+Xuelin Xie, Xiliang Lu, and Long Chen. Enabling Efficient Zero-Shot Noise2Noise for Hyperspectral Images. Revised manuscript resubmitted to "IEEE Transactions on Geoscience and Remote Sensing" (IEEE TGRS).
 
-## 5. Outputs
-
-Each run writes the following files to its output directory:
-
-| File | Description |
-|---|---|
-| `config.json` | Complete experiment configuration |
-| `metrics.json` | Noisy-input and denoised-output metrics |
-| `loss_history.json` | Epoch-wise loss values |
-| `loss_curves.png` | Training loss plots |
-| `reconstruction.png` | Ground-truth, noisy, and denoised RGB composites |
-| `checkpoint.pth` | Model parameters and projection normalization information |
-
-The checkpoint contains the learned network weights, spectral basis, projection normalization statistics, and configuration.
-
-## 6. Tests
-
-Run the basic unit tests from the repository root:
-
-```bash
-pytest -q
-```
-
-## 7. Method components
-
-The implementation is organized into the following stages:
-
-1. **Spectral subspace projection:** compute the leading left singular vectors of the noisy hyperspectral cube and project the observation into a reduced-dimensional subspace.
-2. **Neighborhood completion:** detect low-variation rows and columns and estimate corrupted lines using nearby non-defective lines.
-3. **Self-supervised denoising:** train a convolutional residual estimator using paired downsampling, mask-guided residual loss, and consistency loss.
-4. **Uncertainty weighting:** combine the two objectives using learnable scalar parameters.
-5. **Spectral reconstruction:** invert the projection using the estimated spectral basis and evaluate the reconstructed cube.
-
-## 8. Reproducibility and scientific reporting
-
-For a publication-quality release, we recommend:
-
-- Pinning exact dependency versions and recording the PyTorch/CUDA/GPU environment.
-- Providing dataset download instructions and checksums where redistribution is not permitted.
-- Publishing the exact configuration files used to generate every main-table and ablation result.
-- Reporting mean and standard deviation over multiple independent random seeds when appropriate.
-- Keeping training, validation, and test protocols separate and documenting any use of reference images.
-- Releasing pretrained checkpoints only when their provenance and training configuration are documented.
-- Reporting whether runtime includes data loading, noise generation, preprocessing, training, and reconstruction.
-- Avoiding claims of bitwise determinism unless deterministic kernels and all relevant settings are enforced.
-
-## 9. Implementation notes
-
-- The learnable uncertainty parameters are registered in the model constructor so they are included in the optimizer.
-- The SVD implementation uses `torch.linalg.svd`.
-- The paired downsampler explicitly checks that image height and width are even.
-- The code currently follows the supplied single-image training pipeline (batch size 1).
-- The default RGB band indices `(70, 20, 10)` assume the original input cube has at least 71 bands. Change them for datasets with fewer bands.
-
-## 10. Citation
-
-If you use this code, please cite the corresponding Hyper-ZSD paper. Replace the placeholder below with the final bibliographic information after acceptance:
-
-```bibtex
-@article{hyperzsd,
-  title   = {Enabling Efficient Zero-Shot Noise2Noise for Hyperspectral Images},
-  author  = {Xie, Xuelin and Lu, Xiliang and Chen, Long},
-  journal = {xxx},
-  year    = {xxx},
-  doi     = {xxx}
-}
-```
-
-## License
-
-Add the license required by your institution, funder, or publisher before making the repository public. Do not publish third-party datasets or code unless their licenses permit redistribution.
+# 🛠️ Usage
+*(Code will be updated here upon acceptance)*
