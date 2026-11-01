@@ -1,5 +1,5 @@
 # Hyper-ZSD
-⚠️ <span style="color: blue;">**The code will be fully uploaded upon formal acceptance.**</span>
+⚠️ <span style="color: blue;">**This review-stage release contains only main.py and engine.py; the remaining modules will be released with the full codebase upon acceptance.**</span>
 
 Official PyTorch implementation for the paper: **"Enabling Efficient Zero-Shot Noise2Noise for Hyperspectral Images"**.
 
